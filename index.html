@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>代數理貨員</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- KaTeX CSS & JS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        sevRed: '#EE3124',
+                        sevGreen: '#008060',
+                        sevOrange: '#FFA300',
+                        sevBg: '#F4F7F6',
+                        woodBorder: '#B85C24',
+                        woodPlank: '#824118',
+                    },
+                    boxShadow: {
+                        'shelf-depth': '0 12px 28px rgba(0,0,0,0.18), inset 0 2px 4px rgba(255,255,255,0.4)',
+                        'pop-card': '0 10px 30px -5px rgba(0, 128, 96, 0.25)',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&family=Noto+Sans+TC:wght@500;700;900&display=swap');
+
+        body {
+            font-family: 'Noto Sans TC', 'Fredoka', sans-serif;
+            background-color: #F4F7F6;
+            user-select: none;
+            overflow: hidden; /* 確保全螢幕不產生滾動條 */
+        }
+
+        /* 頂部 7-11 經典三色裝飾條 */
+        .sev-top-bar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #EE3124 0%, #EE3124 33.3%, #008060 33.3%, #008060 66.6%, #FFA300 66.6%, #FFA300 100%);
+            z-index: 50;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        }
+
+        /* 7-11 靜中帶動背景動畫 (低飽和、慢速) */
+        .bg-animated-stripes {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: -2;
+            background: linear-gradient(135deg, 
+                rgba(238,49,36,0.03) 0%, rgba(238,49,36,0.03) 25%, 
+                rgba(0,128,96,0.03) 25%, rgba(0,128,96,0.03) 50%, 
+                rgba(255,163,0,0.03) 50%, rgba(255,163,0,0.03) 75%,
+                transparent 75%
+            );
+            background-size: 120px 120px;
+            animation: moveBg 36s linear infinite;
+        }
+
+        @keyframes moveBg {
+            0% { background-position: 0 0; }
+            100% { background-position: 240px 240px; }
+        }
+
+        .ambient-blob {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.18;
+            z-index: -1;
+            animation: floatBlob 16s ease-in-out infinite alternate;
+        }
+
+        @keyframes floatBlob {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(25px, -20px) scale(1.08); }
+            100% { transform: translate(-20px, 30px) scale(0.95); }
+        }
+
+        .shelf-perspective {
+            perspective: 900px;
+        }
+
+        .shelf-cabinet {
+            background: linear-gradient(180deg, #FFFFFF 0%, #F0F4F2 100%);
+            border: 6px solid #008060;
+            box-shadow: 0 12px 28px rgba(0, 128, 96, 0.15);
+        }
+
+        .shelf-plank {
+            background: linear-gradient(180deg, #FFA300 0%, #E08B00 100%);
+            border-bottom: 4px solid #B87200;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+        }
+
+        /* Item Selected Animation */
+        @keyframes pulse-select {
+            0% { transform: scale(1.08) translateY(-3px); filter: drop-shadow(0 0 6px #FFA300); }
+            100% { transform: scale(1.18) translateY(-6px); filter: drop-shadow(0 0 14px #EE3124); }
+        }
+
+        .item-selected {
+            animation: pulse-select 0.7s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 20;
+        }
+
+        /* Error Shake Animation */
+        @keyframes shake-anim {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-8px) rotate(-1.5deg); }
+            40%, 80% { transform: translateX(8px) rotate(1.5deg); }
+        }
+
+        .shake-effect {
+            animation: shake-anim 0.4s ease-in-out;
+        }
+
+        /* Same Layer Flash Effect */
+        @keyframes flash-yellow {
+            0%, 100% { opacity: 1; }
+            50% { background-color: rgba(255, 163, 0, 0.25); }
+        }
+
+        .flash-warning {
+            animation: flash-yellow 0.4s ease-in-out 2;
+        }
+
+        /* Cancel/Vanish Pop Animation */
+        @keyframes cancel-pop {
+            0% { transform: scale(1); opacity: 1; filter: brightness(1.5); }
+            50% { transform: scale(1.4) rotate(12deg); opacity: 0.9; filter: brightness(2); }
+            100% { transform: scale(0); opacity: 0; }
+        }
+
+        .anim-vanish {
+            animation: cancel-pop 0.45s forwards cubic-bezier(0.1, 0.8, 0.3, 1);
+            pointer-events: none;
+        }
+
+        #particleCanvas {
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            pointer-events: none;
+            z-index: 99;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between p-2 md:p-4 text-slate-800">
+
+    <!-- 頂部 7-11 裝飾線條 -->
+    <div class="sev-top-bar"></div>
+
+    <!-- Background Animations (靜中帶動) -->
+    <div class="bg-animated-stripes"></div>
+    <div class="ambient-blob bg-sevRed w-80 h-80 top-10 left-10"></div>
+    <div class="ambient-blob bg-sevGreen w-96 h-96 bottom-10 right-10" style="animation-delay: -5s;"></div>
+    <div class="ambient-blob bg-sevOrange w-72 h-72 top-1/2 left-1/2" style="animation-delay: -10s;"></div>
+
+    <canvas id="particleCanvas"></canvas>
+
+    <!-- Header Section -->
+    <header class="w-full text-center py-1">
+        <h1 class="text-2xl md:text-3xl font-black tracking-wide text-slate-800 flex items-center justify-center gap-2">
+            🏪 代數理貨員
+        </h1>
+    </header>
+
+    <!-- MAIN INTERACTIVE CONTAINER (響應式雙欄/一屏全顯) -->
+    <main class="w-full max-w-6xl flex-1 mx-auto flex items-center justify-center overflow-hidden">
+
+        <!-- MENU SCREEN -->
+        <div id="menuScreen" class="w-full max-w-lg bg-white rounded-3xl p-6 md:p-8 shadow-pop-card border-4 border-sevGreen flex flex-col items-center space-y-6 text-center">
+            <div class="space-y-3">
+                <h2 class="text-2xl md:text-3xl font-black text-sevGreen pt-2">請選擇理貨學習模式</h2>
+                <p class="text-slate-600 text-sm">透過貨架整理與對消，輕鬆掌握分數與代數分式化簡技巧！</p>
+            </div>
+
+            <div class="w-full space-y-4 pt-2">
+                <button onclick="startGame('store')" class="w-full p-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-sevGreen text-white text-left flex items-center justify-between shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-95 transition-all">
+                    <div>
+                        <div class="text-lg font-bold">模式一：商品理貨</div>
+                        <div class="text-xs text-emerald-100 mt-1">實體商品直觀對消，學習基礎分式約分</div>
+                    </div>
+                    <div class="text-2xl font-bold">➔</div>
+                </button>
+
+                <button onclick="startGame('algebra')" class="w-full p-4 rounded-2xl bg-gradient-to-r from-amber-500 to-sevOrange text-white text-left flex items-center justify-between shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-95 transition-all">
+                    <div>
+                        <div class="text-lg font-bold">模式二：代數分式理貨（循序漸進）</div>
+                        <div class="text-xs text-amber-100 mt-1">由淺入深，從基礎單變數約分（如 <span id="algebraBtnSample"></span>）逐步進階到次方化簡</div>
+                    </div>
+                    <div class="text-2xl font-bold">➔</div>
+                </button>
+            </div>
+        </div>
+
+        <!-- GAME SCREEN (左右雙欄版面) -->
+        <div id="gameScreen" class="w-full h-full hidden flex-col md:flex-row items-stretch justify-center gap-4 p-1">
+            
+            <!-- 左側區域：控制、算式面板、訊息提示 (1/3 寬) -->
+            <div class="w-full md:w-1/3 flex flex-col justify-between gap-2 bg-white/60 backdrop-blur-sm p-3.5 rounded-2xl border border-slate-200/80 shadow-sm">
+                
+                <!-- 頂部按鈕區 -->
+                <div class="flex items-center justify-between gap-2">
+                    <button onclick="showMenu()" class="px-3 py-1.5 rounded-xl bg-white border-2 border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 active:scale-95 transition-all shadow-sm">
+                        🏠 主選單
+                    </button>
+
+                    <div class="flex items-center gap-1 bg-slate-200/80 p-1 rounded-xl">
+                        <button id="modeBtnStore" onclick="switchGameMode('store')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition-all">
+                            🛒 商品模式
+                        </button>
+                        <button id="modeBtnAlgebra" onclick="switchGameMode('algebra')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition-all">
+                            📐 代數模式
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 算式顯示區 (LaTeX) -->
+                <div id="equationContainer" class="flex-1 bg-white border-2 border-sevOrange/60 rounded-2xl p-3 shadow-md flex flex-col items-center justify-center my-1">
+                    <div class="text-xs font-bold text-slate-400 mb-1">當前理貨算式</div>
+                    <div id="mathDisplay" class="text-2xl md:text-4xl text-slate-800 font-bold"></div>
+                </div>
+
+                <!-- 提示訊息 -->
+                <div id="msgBox" class="w-full bg-white py-2.5 px-3 rounded-xl text-center text-xs md:text-sm font-bold border border-slate-200 text-slate-700 shadow-sm transition-all duration-200 min-h-[48px] flex items-center justify-center">
+                    點擊上層項目，再點擊下層對應欄位項目進行抵消。
+                </div>
+
+                <!-- 操作按鈕按鍵組 -->
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="checkAnswer()" class="py-2.5 px-1 rounded-xl font-bold text-xs md:text-sm bg-sevGreen hover:bg-emerald-700 text-white shadow-md active:scale-95 transition-all">
+                        ✓ 驗證結果
+                    </button>
+                    <button onclick="generateNewProblem()" class="py-2.5 px-1 rounded-xl font-bold text-xs md:text-sm bg-sevOrange hover:bg-amber-600 text-white shadow-md active:scale-95 transition-all">
+                        🎲 下一題
+                    </button>
+                    <button onclick="resetCurrentProblem()" class="py-2.5 px-1 rounded-xl font-bold text-xs md:text-sm bg-slate-600 hover:bg-slate-700 text-white shadow-md active:scale-95 transition-all">
+                        ↺ 重置
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- 右側區域：3D 雙層貨架區 (2/3 寬) -->
+            <div id="cabinet" class="shelf-perspective w-full md:w-2/3 h-full flex flex-col justify-center">
+                <div class="shelf-cabinet w-full rounded-2xl p-3 md:p-4 flex flex-col justify-between my-auto">
+                    
+                    <!-- TOP SHELF (分子) -->
+                    <div class="relative">
+                        <div class="text-xs font-bold text-sevRed flex justify-between items-center mb-1 px-1">
+                            <span>【分子層】</span>
+                        </div>
+                        <div id="topShelf" class="grid grid-cols-3 gap-2 min-h-[110px] md:min-h-[135px] bg-slate-100/90 rounded-xl p-2 border border-slate-200">
+                            <!-- Populated by JS -->
+                        </div>
+                        <div class="shelf-plank h-3 w-full rounded-b-md mt-1"></div>
+                    </div>
+
+                    <!-- FRACTION BAR / SEPARATOR -->
+                    <div class="my-2 py-1 bg-gradient-to-r from-sevRed via-sevOrange to-sevGreen rounded-lg flex items-center justify-center text-white font-black text-xs tracking-widest shadow-sm">
+                        ── 分數線 ──
+                    </div>
+
+                    <!-- BOTTOM SHELF (分母) -->
+                    <div class="relative">
+                        <div id="bottomShelf" class="grid grid-cols-3 gap-2 min-h-[110px] md:min-h-[135px] bg-slate-100/90 rounded-xl p-2 border border-slate-200">
+                            <!-- Populated by JS -->
+                        </div>
+                        <div class="shelf-plank h-3 w-full rounded-b-md mt-1"></div>
+                        <div class="text-xs font-bold text-sevGreen flex justify-between items-center mt-1 px-1">
+                            <span>【分母層】</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- AUDIO & GAME SCRIPT -->
+    <script>
+        /* --- AUDIO SYNTHESIZER --- */
+        class SoundFX {
+            constructor() { this.ctx = null; }
+            init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+
+            playSelect() {
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(520, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(880, this.ctx.currentTime + 0.08);
+                gain.gain.setValueAtTime(0.12, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.08);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(); osc.stop(this.ctx.currentTime + 0.08);
+            }
+
+            playSuccess() {
+                this.init();
+                const now = this.ctx.currentTime;
+                [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.15, now + idx * 0.05);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + 0.18);
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.start(now + idx * 0.05); osc.stop(now + idx * 0.05 + 0.2);
+                });
+            }
+
+            playError() {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.linearRampToValueAtTime(110, now + 0.2);
+                gain.gain.setValueAtTime(0.18, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(); osc.stop(now + 0.2);
+            }
+
+            playWarning() {
+                this.init();
+                const now = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(350, now);
+                gain.gain.setValueAtTime(0.12, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                osc.connect(gain); gain.connect(this.ctx.destination);
+                osc.start(); osc.stop(now + 0.15);
+            }
+        }
+
+        const sfx = new SoundFX();
+
+        /* --- PARTICLE SYSTEM --- */
+        const canvas = document.getElementById('particleCanvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function createBurst(x, y) {
+            const colors = ['#EE3124', '#008060', '#FFA300', '#22c55e'];
+            for (let i = 0; i < 22; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8 - 1.5,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    size: Math.random() * 6 + 3,
+                    alpha: 1,
+                    life: 0.95
+                });
+            }
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach((p, idx) => {
+                p.x += p.vx; p.y += p.vy;
+                p.alpha *= p.life;
+                p.size *= 0.96;
+
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                if (p.alpha < 0.05) particles.splice(idx, 1);
+            });
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+
+        /* --- GAME DATA & STATE --- */
+        const STORE_ITEMS_POOL = [
+            { id: 'sushi', emoji: '🍣', name: '壽司' },
+            { id: 'apple', emoji: '🍎', name: '蘋果' },
+            { id: 'drink', emoji: '🥤', name: '飲料' },
+            { id: 'juice', emoji: '🧃', name: '果汁' },
+            { id: 'bento', emoji: '🍱', name: '便當' },
+            { id: 'donut', emoji: '🍩', name: '甜甜圈' },
+            { id: 'icecream', emoji: '🍦', name: '雪糕' },
+            { id: 'burger', emoji: '🍔', name: '漢堡' },
+            { id: 'cake', emoji: '🍰', name: '蛋糕' },
+            { id: 'cookie', emoji: '🍪', name: '曲奇' },
+            { id: 'pudding', emoji: '🍮', name: '布丁' },
+            { id: 'pizza', emoji: '🍕', name: '披薩' }
+        ];
+
+        const ALGEBRA_VAR_SETS = [
+            [{ id: 'x', var: 'x', name: '變數 x' }, { id: 'y', var: 'y', name: '變數 y' }],
+            [{ id: 'a', var: 'a', name: '變數 a' }, { id: 'b', var: 'b', name: '變數 b' }],
+            [{ id: 'm', var: 'm', name: '變數 m' }, { id: 'n', var: 'n', name: '變數 n' }],
+            [{ id: 'p', var: 'p', name: '變數 p' }, { id: 'q', var: 'q', name: '變數 q' }],
+            [{ id: 'u', var: 'u', name: '變數 u' }, { id: 'v', var: 'v', name: '變數 v' }]
+        ];
+
+        let currentMode = 'store';
+        let problemStep = 0; // Natural progression step for algebra mode
+        let currentColumns = []; // 3 columns definition
+
+        // Numerical Coefficients
+        let topCoeff = 12;
+        let bottomCoeff = 16;
+        let initialTopCoeff = 12;
+        let initialBottomCoeff = 16;
+
+        let topShelfData = [[], [], []];
+        let bottomShelfData = [[], [], []];
+        let initialTopData = [];
+        let initialBottomData = [];
+
+        let selectedItem = null; // { layer: 'top', colIndex: 0, itemIndex: 0 }
+
+        /* --- HIGH RANDOMNESS COEFFICIENT PAIR GENERATOR --- */
+        function getRandomGCDCoeffPair() {
+            // 動態生成隨機公因數 2 ~ 6
+            const gcd = Math.floor(Math.random() * 5) + 2; 
+            // 隨機倍數 1 ~ 8
+            const m1 = Math.floor(Math.random() * 8) + 1;
+            let m2 = Math.floor(Math.random() * 8) + 1;
+            
+            // 確保上下兩數不完全一致（除非特意測試）
+            if (m1 === m2 && Math.random() > 0.2) {
+                m2 = m1 + (Math.random() > 0.5 ? 1 : -1);
+                if (m2 <= 0) m2 = 2;
+            }
+
+            return [m1 * gcd, m2 * gcd];
+        }
+
+        /* --- INITIALIZE LATEX MENU TEXT ON LOAD --- */
+        window.addEventListener('DOMContentLoaded', () => {
+            renderKatexIn('algebraBtnSample', '\\frac{2x}{6}');
+        });
+
+        function renderKatexIn(elementId, latexStr) {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+            try {
+                katex.render(latexStr, el, { throwOnError: false, displayMode: false });
+            } catch (e) {
+                el.innerText = latexStr;
+            }
+        }
+
+        /* --- NAVIGATION --- */
+        function startGame(mode) {
+            document.getElementById('menuScreen').classList.add('hidden');
+            document.getElementById('gameScreen').classList.remove('hidden');
+            document.getElementById('gameScreen').classList.add('flex');
+            problemStep = 0;
+            switchGameMode(mode);
+        }
+
+        function showMenu() {
+            document.getElementById('gameScreen').classList.add('hidden');
+            document.getElementById('gameScreen').classList.remove('flex');
+            document.getElementById('menuScreen').classList.remove('hidden');
+        }
+
+        function switchGameMode(mode) {
+            currentMode = mode;
+            problemStep = 0;
+            const bStore = document.getElementById('modeBtnStore');
+            const bAlgebra = document.getElementById('modeBtnAlgebra');
+
+            if (mode === 'store') {
+                bStore.className = "px-2.5 py-1 rounded-lg text-xs font-bold bg-sevGreen text-white shadow-sm";
+                bAlgebra.className = "px-2.5 py-1 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900";
+            } else {
+                bAlgebra.className = "px-2.5 py-1 rounded-lg text-xs font-bold bg-sevOrange text-white shadow-sm";
+                bStore.className = "px-2.5 py-1 rounded-lg text-xs font-bold text-slate-600 hover:text-slate-900";
+            }
+
+            generateNewProblem();
+        }
+
+        /* --- GCD CALCULATOR --- */
+        function getGCD(a, b) {
+            return b === 0 ? a : getGCD(b, a % b);
+        }
+
+        /* --- PROBLEM GENERATOR --- */
+        function generateNewProblem() {
+            selectedItem = null;
+            topShelfData = [[], [], []];
+            bottomShelfData = [[], [], []];
+
+            if (currentMode === 'store') {
+                // 高隨機揀選 3 種超商商品
+                const shuffled = [...STORE_ITEMS_POOL].sort(() => Math.random() - 0.5);
+                currentColumns = [
+                    { type: 'item', ...shuffled[0] },
+                    { type: 'item', ...shuffled[1] },
+                    { type: 'item', ...shuffled[2] }
+                ];
+                topCoeff = 1; bottomCoeff = 1;
+
+                let activeColCount = 0;
+                for (let c = 0; c < 3; c++) {
+                    const shouldInclude = Math.random() > 0.25 || activeColCount === 0;
+                    if (shouldInclude) {
+                        activeColCount++;
+                        const topQty = Math.floor(Math.random() * 3) + 1;
+                        const botQty = Math.floor(Math.random() * 3) + 1;
+                        for (let q = 0; q < topQty; q++) topShelfData[c].push(currentColumns[c]);
+                        for (let q = 0; q < botQty; q++) bottomShelfData[c].push(currentColumns[c]);
+                    }
+                }
+            } else {
+                // 代數模式（高隨機性 + 循序漸進）
+                problemStep++;
+                const varSet = ALGEBRA_VAR_SETS[Math.floor(Math.random() * ALGEBRA_VAR_SETS.length)];
+
+                currentColumns = [
+                    { type: 'number', id: 'num', name: '數字係數' },
+                    { type: 'var', ...varSet[0] },
+                    { type: 'var', ...varSet[1] }
+                ];
+
+                if (problemStep <= 3) {
+                    // STAGE 1: 單變數、次方為 1，高隨機數字組合
+                    const pair = getRandomGCDCoeffPair();
+                    topCoeff = pair[0];
+                    bottomCoeff = pair[1];
+
+                    // 隨機變換變數位置（分子有、分母有、或兩者皆有）
+                    const layoutType = Math.floor(Math.random() * 3);
+                    if (layoutType === 0) { // 分子有，分母無 (如 4x / 2)
+                        topShelfData[1].push(currentColumns[1]);
+                    } else if (layoutType === 1) { // 分子無，分母有 (如 2 / 6x)
+                        bottomShelfData[1].push(currentColumns[1]);
+                    } else { // 兩者皆有 (如 6x / 2x)
+                        topShelfData[1].push(currentColumns[1]);
+                        bottomShelfData[1].push(currentColumns[1]);
+                    }
+
+                } else if (problemStep <= 6) {
+                    // STAGE 2: 單變數與次方 (1~3次方)
+                    const pair = getRandomGCDCoeffPair();
+                    topCoeff = pair[0];
+                    bottomCoeff = pair[1];
+
+                    const topQty = Math.floor(Math.random() * 3) + 1;
+                    const botQty = Math.floor(Math.random() * 3) + 1;
+                    for (let q = 0; q < topQty; q++) topShelfData[1].push(currentColumns[1]);
+                    for (let q = 0; q < botQty; q++) bottomShelfData[1].push(currentColumns[1]);
+
+                } else {
+                    // STAGE 3: 雙變數與次方 (1~3次方)
+                    const pair = getRandomGCDCoeffPair();
+                    topCoeff = pair[0];
+                    bottomCoeff = pair[1];
+
+                    for (let c = 1; c <= 2; c++) {
+                        const topQty = Math.floor(Math.random() * 3) + 1;
+                        const botQty = Math.floor(Math.random() * 3) + 1;
+                        for (let q = 0; q < topQty; q++) topShelfData[c].push(currentColumns[c]);
+                        for (let q = 0; q < botQty; q++) bottomShelfData[c].push(currentColumns[c]);
+                    }
+                }
+            }
+
+            initialTopCoeff = topCoeff;
+            initialBottomCoeff = bottomCoeff;
+            initialTopData = topShelfData.map(col => [...col]);
+            initialBottomData = bottomShelfData.map(col => [...col]);
+
+            updateMessage('點擊上層項目，再點擊下層對應欄位項目進行抵消。', 'normal');
+            renderShelves();
+        }
+
+        function resetCurrentProblem() {
+            selectedItem = null;
+            topCoeff = initialTopCoeff;
+            bottomCoeff = initialBottomCoeff;
+            topShelfData = initialTopData.map(col => [...col]);
+            bottomShelfData = initialBottomData.map(col => [...col]);
+            sfx.playSelect();
+            updateMessage('已重置為本題初始狀態。', 'normal');
+            renderShelves();
+        }
+
+        /* --- RENDERERS --- */
+        function renderShelves() {
+            renderShelfContainer('topShelf', topShelfData, 'top');
+            renderShelfContainer('bottomShelf', bottomShelfData, 'bottom');
+            renderMathEquation();
+        }
+
+        function renderShelfContainer(containerId, shelfData, layerName) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+
+            for (let colIdx = 0; colIdx < 3; colIdx++) {
+                const colDef = currentColumns[colIdx];
+                const colItems = shelfData[colIdx];
+
+                const colEl = document.createElement('div');
+                colEl.className = 'flex flex-col-reverse items-center justify-start gap-1 p-1.5 rounded-lg bg-white border border-slate-200 relative shadow-inner';
+
+                const label = document.createElement('div');
+                label.className = 'text-[11px] font-bold text-slate-500 pt-1 border-t border-slate-200 w-full text-center truncate';
+                label.innerText = colDef.name;
+                colEl.appendChild(label);
+
+                const stackWrapper = document.createElement('div');
+                stackWrapper.className = 'flex flex-col-reverse items-center justify-start gap-1 w-full flex-1 min-h-[65px] md:min-h-[85px]';
+
+                if (currentMode === 'algebra' && colIdx === 0) {
+                    const coeffValue = (layerName === 'top') ? topCoeff : bottomCoeff;
+                    const isSelected = selectedItem && 
+                                       selectedItem.layer === layerName && 
+                                       selectedItem.colIndex === 0;
+
+                    const numBtn = document.createElement('button');
+                    numBtn.className = `relative w-full py-1.5 md:py-2 my-auto rounded-xl font-black text-lg md:text-2xl transition-all shadow-sm ${
+                        isSelected 
+                            ? 'item-selected bg-amber-100 text-sevOrange border-2 border-sevOrange' 
+                            : 'bg-amber-50 text-amber-800 border-2 border-amber-300 hover:scale-105 active:scale-95'
+                    }`;
+                    numBtn.innerText = coeffValue;
+
+                    numBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        handleCoeffClick(layerName, numBtn);
+                    };
+
+                    stackWrapper.appendChild(numBtn);
+
+                } else {
+                    colItems.forEach((item, itemIdx) => {
+                        const itemEl = document.createElement('button');
+                        const isSelected = selectedItem && 
+                                           selectedItem.layer === layerName && 
+                                           selectedItem.colIndex === colIdx && 
+                                           selectedItem.itemIndex === itemIdx;
+
+                        itemEl.className = `relative flex items-center justify-center p-1 rounded-lg transition-all ${
+                            isSelected ? 'item-selected bg-amber-100 border-2 border-sevOrange' : 'hover:scale-110 active:scale-95'
+                        }`;
+
+                        if (currentMode === 'store') {
+                            itemEl.innerHTML = `<span class="text-2xl md:text-3xl filter drop-shadow-sm">${item.emoji}</span>`;
+                        } else {
+                            itemEl.innerHTML = `<span class="text-base md:text-lg font-black font-mono text-sevGreen bg-emerald-50 px-2 py-0.5 rounded-md border border-sevGreen/40">${item.var}</span>`;
+                        }
+
+                        itemEl.onclick = (e) => {
+                            e.stopPropagation();
+                            handleItemClick(layerName, colIdx, itemIdx, itemEl);
+                        };
+
+                        stackWrapper.appendChild(itemEl);
+                    });
+                }
+
+                colEl.appendChild(stackWrapper);
+                container.appendChild(colEl);
+            }
+        }
+
+        /* --- KATEX EQUATION RENDERER (含當分母為 1 時自動化簡為整數/分子邏輯) --- */
+        function renderMathEquation() {
+            const display = document.getElementById('mathDisplay');
+
+            let numStr = buildLatexSide(topCoeff, topShelfData);
+            let denStr = buildLatexSide(bottomCoeff, bottomShelfData);
+
+            let latexQuery = '';
+
+            // 如果分母結果為 1，直接呈現分子（不寫成分數格式）
+            if (denStr === '1') {
+                latexQuery = numStr;
+            } else {
+                latexQuery = `\\frac{${numStr}}{${denStr}}`;
+            }
+
+            try {
+                katex.render(latexQuery, display, {
+                    throwOnError: false,
+                    displayMode: true
+                });
+            } catch (e) {
+                display.innerText = denStr === '1' ? numStr : `${numStr} / ${denStr}`;
+            }
+        }
+
+        function buildLatexSide(coeff, shelfData) {
+            let parts = [];
+
+            if (currentMode === 'algebra') {
+                if (coeff > 1 || (shelfData[1].length === 0 && shelfData[2].length === 0)) {
+                    parts.push(`${coeff}`);
+                }
+            }
+
+            for (let i = 0; i < 3; i++) {
+                if (currentMode === 'algebra' && i === 0) continue;
+
+                const count = shelfData[i].length;
+                if (count > 0) {
+                    const symbol = currentMode === 'store' ? currentColumns[i].emoji : currentColumns[i].var;
+                    if (count === 1) {
+                        parts.push(symbol);
+                    } else {
+                        parts.push(`${symbol}^{${count}}`);
+                    }
+                }
+            }
+
+            if (parts.length === 0) return '1';
+            return parts.join('');
+        }
+
+        /* --- INTERACTION HANDLERS --- */
+        function handleCoeffClick(layer, element) {
+            if (layer === 'top') {
+                if (selectedItem && selectedItem.layer === 'top' && selectedItem.colIndex === 0) {
+                    selectedItem = null;
+                    sfx.playSelect();
+                    updateMessage('已取消選擇數字係數。', 'normal');
+                } else {
+                    selectedItem = { layer: 'top', colIndex: 0, isCoeff: true };
+                    sfx.playSelect();
+                    updateMessage(`已選擇上層數字【${topCoeff}】，請點擊下層數字【${bottomCoeff}】進行約分！`, 'normal');
+                }
+            } else if (layer === 'bottom') {
+                if (!selectedItem) {
+                    sfx.playWarning();
+                    triggerShake();
+                    updateMessage('請先點擊「上層」數字係數！', 'error');
+                    return;
+                }
+
+                if (selectedItem.isCoeff) {
+                    const gcd = getGCD(topCoeff, bottomCoeff);
+                    if (gcd > 1) {
+                        const rect = element.getBoundingClientRect();
+                        createBurst(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                        sfx.playSuccess();
+
+                        const oldTop = topCoeff;
+                        const oldBottom = bottomCoeff;
+
+                        topCoeff /= gcd;
+                        bottomCoeff /= gcd;
+                        selectedItem = null;
+
+                        updateMessage(`✨ 數字約分成功！${oldTop} 與 ${oldBottom} 同除以 ${gcd} 變為 ${topCoeff} 和 ${bottomCoeff}！`, 'success');
+                    } else {
+                        sfx.playWarning();
+                        triggerShake();
+                        updateMessage(`數字 ${topCoeff} 與 ${bottomCoeff} 互質，無法再簡化囉！`, 'warning');
+                        selectedItem = null;
+                    }
+                } else {
+                    sfx.playError();
+                    triggerShake();
+                    updateMessage('❌ 數字不能與變數字母互相抵消！', 'error');
+                }
+            }
+            renderShelves();
+        }
+
+        function handleItemClick(layer, colIndex, itemIndex, element) {
+            if (layer === 'top') {
+                if (selectedItem && selectedItem.layer === 'top') {
+                    if (selectedItem.colIndex === colIndex && selectedItem.itemIndex === itemIndex) {
+                        selectedItem = null;
+                        sfx.playSelect();
+                        updateMessage('已取消選擇。', 'normal');
+                    } else {
+                        selectedItem = { layer: 'top', colIndex, itemIndex };
+                        sfx.playWarning();
+                        triggerWarningFlash();
+                        updateMessage('已更換選取的上層項目。（注意：同層物品無法互相抵消）', 'warning');
+                    }
+                } else {
+                    selectedItem = { layer: 'top', colIndex, itemIndex };
+                    sfx.playSelect();
+                    const name = currentColumns[colIndex].name;
+                    updateMessage(`已選擇上層【${name}】，請點擊下層同一豎排項目進行抵消。`, 'normal');
+                }
+                renderShelves();
+                return;
+            }
+
+            if (layer === 'bottom') {
+                if (!selectedItem) {
+                    sfx.playWarning();
+                    triggerShake();
+                    updateMessage('請先點擊「上層」項目，再選擇「下層」項目！', 'error');
+                    return;
+                }
+
+                if (selectedItem.isCoeff) {
+                    sfx.playError();
+                    triggerShake();
+                    updateMessage('❌ 數字不能與變數字母互相抵消！', 'error');
+                    return;
+                }
+
+                if (selectedItem.colIndex === colIndex) {
+                    const rect = element.getBoundingClientRect();
+                    createBurst(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                    element.classList.add('anim-vanish');
+                    sfx.playSuccess();
+
+                    const itemName = currentColumns[colIndex].name;
+                    updateMessage(`✨ 抵消成功！成功約分一組【${itemName}】！`, 'success');
+
+                    setTimeout(() => {
+                        topShelfData[selectedItem.colIndex].splice(selectedItem.itemIndex, 1);
+                        bottomShelfData[colIndex].splice(itemIndex, 1);
+                        selectedItem = null;
+                        renderShelves();
+                    }, 220);
+
+                } else {
+                    sfx.playError();
+                    triggerShake();
+                    const topName = currentColumns[selectedItem.colIndex].name;
+                    const botName = currentColumns[colIndex].name;
+                    updateMessage(`❌ 種類不同無法抵消！（上層為【${topName}】，下層為【${botName}】）`, 'error');
+                }
+            }
+        }
+
+        /* --- UI FEEDBACK HELPERS --- */
+        function updateMessage(text, type = 'normal') {
+            const msgBox = document.getElementById('msgBox');
+            msgBox.innerText = text;
+
+            msgBox.className = "w-full py-2.5 px-3 rounded-xl text-center text-xs md:text-sm font-bold border transition-all duration-200 min-h-[48px] flex items-center justify-center ";
+
+            if (type === 'normal') {
+                msgBox.classList.add('bg-white', 'border-slate-200', 'text-slate-700');
+            } else if (type === 'success') {
+                msgBox.classList.add('bg-emerald-500', 'border-emerald-600', 'text-white', 'shadow-md');
+            } else if (type === 'error') {
+                msgBox.classList.add('bg-sevRed', 'border-red-700', 'text-white', 'shadow-md');
+            } else if (type === 'warning') {
+                msgBox.classList.add('bg-sevOrange', 'border-amber-600', 'text-white');
+            }
+        }
+
+        function triggerShake() {
+            const cabinet = document.getElementById('cabinet');
+            cabinet.classList.remove('shake-effect');
+            void cabinet.offsetWidth;
+            cabinet.classList.add('shake-effect');
+        }
+
+        function triggerWarningFlash() {
+            const topShelf = document.getElementById('topShelf');
+            topShelf.classList.remove('flash-warning');
+            void topShelf.offsetWidth;
+            topShelf.classList.add('flash-warning');
+        }
+
+        function checkAnswer() {
+            let canCancelVars = false;
+
+            for (let i = 0; i < 3; i++) {
+                if (currentMode === 'algebra' && i === 0) continue;
+                if (topShelfData[i].length > 0 && bottomShelfData[i].length > 0) {
+                    canCancelVars = true;
+                    break;
+                }
+            }
+
+            const canReduceCoeff = (currentMode === 'algebra' && getGCD(topCoeff, bottomCoeff) > 1);
+
+            if (canCancelVars || canReduceCoeff) {
+                sfx.playWarning();
+                triggerShake();
+                if (canReduceCoeff && !canCancelVars) {
+                    updateMessage('💡 提示：請點擊數字【' + topCoeff + '】與【' + bottomCoeff + '】將數字進行約分！', 'warning');
+                } else {
+                    updateMessage('💡 提示：貨架上還有可抵消的項目，請繼續整理！', 'warning');
+                }
+            } else {
+                sfx.playSuccess();
+                createBurst(window.innerWidth / 2, window.innerHeight / 2);
+                updateMessage('🏆 太棒了！算式與貨架已完全簡化至「最簡狀態」！', 'success');
+            }
+        }
+    </script>
+</body>
+</html>
